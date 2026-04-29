@@ -3,7 +3,7 @@ import database as db
 
 st.title("⚙️ Settings")
 
-tab_profile, tab_prefs, tab_about = st.tabs(["Profile", "App Preferences", "About"])
+tab_profile, tab_prefs = st.tabs(["Profile", "App Preferences"])
 
 with tab_profile:
     st.subheader("Account Profile")
@@ -40,26 +40,3 @@ with tab_prefs:
         if st.button("Save Preferences"):
             st.success("Preferences saved successfully!")
 
-with tab_about:
-    st.subheader("About")
-    st.markdown("""
-    This Road Damage Detection (RDD) application is designed to automate the process of identifying and cataloging road anomalies such as potholes and cracks using AI inference. By integrating with Supabase, it provides a robust, persistent storage solution for all media and detection data.
-    """)
-    st.divider()
-    st.subheader("Meet the Developer")
-    with st.container(border=True):
-        col1, col2 = st.columns([1, 3], gap="large")
-        with col1:
-            try:
-                st.image("assets/profile.png", width="stretch")
-            except Exception:
-                st.info("Profile picture unavailable.")
-        with col2:
-            st.markdown("### Engr. Christopher F. Cunanan")
-            st.markdown("""
-            Christopher is a dedicated software engineer and systems architect with a passion for integrating modern AI solutions into practical, real-world infrastructure problems. 
-            
-            With a strong background in both civil engineering concepts and advanced computer vision applications, he spearheaded the development of this Road Damage Detection platform to streamline road maintenance surveys.
-            
-            *Contact: christopher.cunanan@example.com*
-            """)
