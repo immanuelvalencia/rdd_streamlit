@@ -305,12 +305,12 @@ st.markdown('<div class="section-header">Project Team</div>', unsafe_allow_html=
 
 project_team = [
     {"name": "Dr. Ryan Reyes", "role": "Project Leader", "id": "ryan_reyes"},
-    {"name": "Engr. Christopher Cunanan", "role": "PhD Graduate Student Collaborator", "id": "christopher_cunanan"},
-    {"name": "Engr. Jessica Velasco", "role": "Project Member", "id": "jessica_velasco"},
+    {"name": "Dr. Ira Estropia", "role": "Project Member", "id": "ira_estropia"},
+    {"name": "Engr. Immanuel Jose C. Valencia", "role": "Project Member", "id": "immanuel_valencia"},
     {"name": "Dr. Lean Karlo Tolentino", "role": "Project Member", "id": "lean_karlo"},
     {"name": "Engr. Mark Melgrito", "role": "Project Member", "id": "mark_melgrito"},
-    {"name": "Dr. Ira Estropia", "role": "Project Member", "id": "ira_estropia"},
-    {"name": "Engr. Immanuel Valencia", "role": "Project Member", "id": "immanuel_valencia"}
+    {"name": "Engr. Jessica Velasco", "role": "Project Member", "id": "jessica_velasco"},
+    {"name": "Engr. Christopher Cunanan", "role": "PhD Graduate Student Collaborator", "id": "christopher_cunanan"},
 ]
 
 rows = [project_team[i:i+4] for i in range(0, len(project_team), 4)]
