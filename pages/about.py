@@ -1,11 +1,18 @@
 import streamlit as st
 import os
+import base64
 
 st.set_page_config(page_title="About RCMED", page_icon="🏢", layout="wide")
 
 # ── ASSET CONSTANTS ──────────────────────────────────────────────────────────
 ASSETS_DIR = "assets"
 os.makedirs(ASSETS_DIR, exist_ok=True)
+
+def get_base64_image(image_path):
+    if os.path.exists(image_path):
+        with open(image_path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    return None
 
 # ── CUSTOM CSS ───────────────────────────────────────────────────────────────
 st.markdown("""
@@ -36,13 +43,13 @@ st.markdown("""
         color: #1e293b;
         font-size: 2rem;
         font-weight: 700;
-        margin-top: 2rem;
+        margin-top: 3rem;
         margin-bottom: 1.5rem;
         border-left: 5px solid #800000;
         padding-left: 1rem;
     }
     
-    /* Cards */
+    /* Collab Cards */
     .collab-card {
         background: white;
         padding: 2rem;
@@ -53,9 +60,10 @@ st.markdown("""
         border: 1px solid #e2e8f0;
         display: flex;
         flex-direction: column;
-        justify-content: flex-start;
-        height: 100%;
-        min-height: 250px;
+        justify-content: center;
+        align-items: center;
+        height: 280px; /* Fixed height for uniformity */
+        margin-bottom: 1rem;
     }
     .collab-card:hover {
         transform: translateY(-5px);
@@ -78,11 +86,13 @@ st.markdown("""
     .logo-placeholder {
         width: 80px;
         height: 80px;
+        flex-shrink: 0;
         background: #f1f5f9;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
+        margin: 0 auto 1rem;
         color: #64748b;
         font-weight: 600;
         font-size: 0.7rem;
@@ -94,11 +104,44 @@ st.markdown("""
         color: #334155;
         font-weight: 600;
         line-height: 1.4;
-        flex-grow: 1;
+        font-size: 0.95rem;
+    }
+
+    /* Team Cards */
+    .team-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        text-align: center;
+        border: 1px solid #e2e8f0;
+        height: 240px; /* Fixed height for uniformity */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s;
+        margin-bottom: 1rem;
+    }
+
+    .team-card:hover { transform: translateY(-3px); }
+    
+    .team-photo-container {
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        margin-bottom: 1rem;
+        overflow: hidden;
+        border: 3px solid #800000;
         display: flex;
         align-items: center;
         justify-content: center;
+        background: #f8fafc;
     }
+    .team-photo { width: 100%; height: 100%; object-fit: cover; }
+    
+    .team-name { font-weight: 700; color: #1e293b; font-size: 1.05rem; margin-bottom: 0.25rem; }
+    .team-role { font-size: 0.85rem; color: #64748b; line-height: 1.3; font-weight: 500; }
     
     /* Profile Section */
     .profile-card {
@@ -145,8 +188,8 @@ st.markdown("""
         position: absolute;
         bottom: -10px;
         right: -10px;
-        width: 50px;
-        height: 50px;
+        width: 55px;
+        height: 55px;
         background: white;
         border-radius: 50%;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -226,21 +269,18 @@ st.markdown("""
 
 # ── ABOUT THE PROJECT ────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">About the Project</div>', unsafe_allow_html=True)
-st.markdown("""
-<div style="color: #475569; line-height: 1.8; font-size: 1.1rem; max-width: 1000px; margin-bottom: 3rem;">
+st.write("""
     RCMED is a technology-driven system designed to automate and enhance road pavement damage detection, 
     classification, and evaluation across the Philippines. By integrating deep learning models with geotagged 
     mobile data collection, the platform provides a more objective and efficient approach to road condition 
     assessment. This project supports faster decision-making for government agencies, ensuring that road maintenance 
     and infrastructure improvements are guided by accurate, real-time data.
-</div>
-""", unsafe_allow_html=True)
+""")
 
 # ── PROJECT COLLABORATION ────────────────────────────────────────────────────
 st.markdown('<div class="section-header">Project Collaboration</div>', unsafe_allow_html=True)
 
-cols = st.columns(5)
-
+cols_p = st.columns(5)
 partners = [
     {"name": "Technological University of the Philippines", "id": "tup", "label": "TUP Logo"},
     {"name": "De La Salle University", "id": "dlsu", "label": "DLSU Logo"},
@@ -250,16 +290,9 @@ partners = [
 ]
 
 for i, partner in enumerate(partners):
-    with cols[i]:
-        logo_path = os.path.join(ASSETS_DIR, f"{partner['id']}_logo.png")
-        if os.path.exists(logo_path):
-            import base64
-            with open(logo_path, "rb") as f:
-                encoded = base64.b64encode(f.read()).decode()
-            logo_html = f'<div class="logo-container"><img src="data:image/png;base64,{encoded}" class="logo-img"></div>'
-        else:
-            logo_html = f'<div class="logo-container"><div class="logo-placeholder">{partner["label"]}</div></div>'
-            
+    with cols_p[i]:
+        b64 = get_base64_image(os.path.join(ASSETS_DIR, f"{partner['id']}_logo.png"))
+        logo_html = f'<div class="logo-container"><img src="data:image/png;base64,{b64}" class="logo-img"></div>' if b64 else f'<div class="logo-container"><div class="logo-placeholder">{partner["label"]}</div></div>'
         st.markdown(f"""
         <div class="collab-card">
             {logo_html}
@@ -267,56 +300,90 @@ for i, partner in enumerate(partners):
         </div>
         """, unsafe_allow_html=True)
 
-# ── ABOUT THE COLLABORATOR ───────────────────────────────────────────────────
+# ── PROJECT TEAM ─────────────────────────────────────────────────────────────
+st.markdown('<div class="section-header">Project Team</div>', unsafe_allow_html=True)
+
+project_team = [
+    {"name": "Dr. Ryan Reyes", "role": "Project Leader", "id": "ryan_reyes"},
+    {"name": "Engr. Christopher Cunanan", "role": "PhD Graduate Student Collaborator", "id": "christopher_cunanan"},
+    {"name": "Engr. Jessica Velasco", "role": "Project Member", "id": "jessica_velasco"},
+    {"name": "Dr. Lean Karlo Tolentino", "role": "Project Member", "id": "lean_karlo"},
+    {"name": "Engr. Mark Melgrito", "role": "Project Member", "id": "mark_melgrito"},
+    {"name": "Dr. Ira Estropia", "role": "Project Member", "id": "ira_estropia"},
+    {"name": "Engr. Immanuel Valencia", "role": "Project Member", "id": "immanuel_valencia"}
+]
+
+rows = [project_team[i:i+4] for i in range(0, len(project_team), 4)]
+for row in rows:
+    cols = st.columns(4)
+    for i, member in enumerate(row):
+        with cols[i]:
+            b64 = get_base64_image(os.path.join(ASSETS_DIR, f"{member['id']}.png"))
+            photo_html = f'<img src="data:image/png;base64,{b64}" class="team-photo">' if b64 else '<div style="color:#cbd5e1; font-size:2rem;">👤</div>'
+            st.markdown(f"""
+            <div class="team-card">
+                <div class="team-photo-container">{photo_html}</div>
+                <div class="team-name">{member['name']}</div>
+                <div class="team-role">{member['role']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+# ── TECHNICAL TEAM ───────────────────────────────────────────────────────────
+st.markdown('<div class="section-header">Technical Team</div>', unsafe_allow_html=True)
+
+tech_team = [
+    {"name": "Engr. Joseph Den Amores", "role": "Developer", "id": "joseph_amores"},
+    {"name": "Engr. Charles Darwin Maddela", "role": "Developer", "id": "chad_madella"},
+    {"name": "Engr. Victor Sebastian Bondoc", "role": "Developer", "id": "victor_sebastian"},
+    {"name": "Engr. Julius Nikolai Bernardo", "role": "Developer", "id": "julius_bernardo"},
+    {"name": "Ms. Maria Kristinna Alina", "role": "Project Manager", "id": "kristina_alina"}
+]
+
+rows_tech = [tech_team[i:i+4] for i in range(0, len(tech_team), 4)]
+for row in rows_tech:
+    cols = st.columns(4)
+    for i, member in enumerate(row):
+        with cols[i]:
+            b64 = get_base64_image(os.path.join(ASSETS_DIR, f"{member['id']}.png"))
+            photo_html = f'<img src="data:image/png;base64,{b64}" class="team-photo">' if b64 else '<div style="color:#cbd5e1; font-size:2rem;">👤</div>'
+            st.markdown(f"""
+            <div class="team-card">
+                <div class="team-photo-container">{photo_html}</div>
+                <div class="team-name">{member['name']}</div>
+                <div class="team-role">{member['role']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+# ── ABOUT ME ─────────────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">About Me</div>', unsafe_allow_html=True)
 
-profile_path = os.path.join(ASSETS_DIR, "profile.png")
-bulsu_logo_path = os.path.join(ASSETS_DIR, "bulsu_logo.png")
+p_b64 = get_base64_image(os.path.join(ASSETS_DIR, "profile.png"))
+profile_html = f'<img src="data:image/png;base64,{p_b64}" class="profile-photo">' if p_b64 else '<div class="profile-placeholder">Profile Photo</div>'
 
-if os.path.exists(profile_path):
-    import base64
-    with open(profile_path, "rb") as f:
-        p_encoded = base64.b64encode(f.read()).decode()
-    profile_html = f'<img src="data:image/png;base64,{p_encoded}" class="profile-photo">'
-else:
-    profile_html = '<div class="profile-placeholder">Profile Photo</div>'
-
-if os.path.exists(bulsu_logo_path):
-    import base64
-    with open(bulsu_logo_path, "rb") as f:
-        b_encoded = base64.b64encode(f.read()).decode()
-    bulsu_overlay_html = f'<div class="bulsu-logo-overlay"><img src="data:image/png;base64,{b_encoded}" class="logo-img"></div>'
-else:
-    bulsu_overlay_html = '<div class="bulsu-logo-overlay">BulSU Logo</div>'
+b_b64 = get_base64_image(os.path.join(ASSETS_DIR, "bulsu_logo.png"))
+bulsu_overlay_html = f'<div class="bulsu-logo-overlay"><img src="data:image/png;base64,{b_b64}" class="logo-img"></div>' if b_b64 else '<div class="bulsu-logo-overlay">BulSU Logo</div>'
 
 st.markdown(f"""
 <div class="profile-card">
-    <div class="profile-img-container">
-        {profile_html}
-        {bulsu_overlay_html}
-    </div>
+    <div class="profile-img-container">{profile_html}{bulsu_overlay_html}</div>
     <div class="profile-details">
         <div class="profile-name">Engr. Christopher F. Cunanan, PCpE</div>
         <div class="profile-title">PhD Graduate Student Collaborator, RCMED Project</div>
         <ul class="profile-list">
-            <li>BS Computer Engineering, De La Salle-Araneta University</li>
-            <li>Master of Engineering major in Computer Engineering, Technological University of the Philippines</li>
-            <li>PhD Graduate Student Collaborator, RCMED Project</li>
-            <li>From Bulacan State University</li>
-            <li>Associate Member, National Research Council of the Philippines (NRCP)</li>
-            <li>Former faculty and Engineering Department Head, Lyceum of the Philippines University Manila</li>
-            <li>Former faculty and Dean, AMA Computer College Malolos</li>
-            <li>Former faculty, De La Salle-Araneta University</li>
-            <li>Industry experience in software engineering and testing</li>
-            <li>Researcher, mentor, chess master and coach, and technopreneur</li>
+            <li>Assistant Professor at Bulacan State University</li>
+            <li>PhD Graduate Student and Collaborator of the RCMED Project</li>
+            <li>Associate Member of the National Research Council of the Philippines (NRCP)</li>
+            <li>Earned his BS in Computer Engineering from De La Salle-Araneta University</li>
+            <li>Earned his Master of Engineering major in Computer Engineering from the Technological University of the Philippines</li>
+            <li>Former Faculty Member and Engineering Department Head at Lyceum of the Philippines University Manila</li>
+            <li>Former Faculty Member and Dean at AMA Computer College Malolos</li>
+            <li>Former Faculty Member at De La Salle-Araneta University</li>
+            <li>Has industry experience in software engineering and testing</li>
+            <li>Active researcher, mentor, chess master and coach, and technopreneur</li>
         </ul>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 # ── FOOTER ───────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="designer-footer">
-    Designed by <span class="swyft">swyft</span>
-</div>
-""", unsafe_allow_html=True)
+st.markdown('<div class="designer-footer">Designed by <span class="swyft">swyft</span></div>', unsafe_allow_html=True)

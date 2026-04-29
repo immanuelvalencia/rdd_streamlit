@@ -25,7 +25,7 @@ analytics_page       = st.Page("pages/analytics.py",       title="Dashboard",   
 projects_page        = st.Page("pages/projects.py",        title="Projects",        icon="📂")
 project_details_page = st.Page("pages/project_details.py", title="Project Viewer",  icon="🔍", url_path="project")
 settings_page        = st.Page("pages/settings.py",        title="Settings",        icon="⚙️")
-about_page           = st.Page("pages/about.py",           title="About RCMED",      icon="🏢")
+about_page           = st.Page("pages/about.py",           title="About the Project",      icon="🏢")
 
 if st.session_state.user:
     profile = st.session_state.get('profile', {})
