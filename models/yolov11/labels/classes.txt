@@ -1,0 +1,9 @@
+# Road Damage Class Labels
+# One class name per line — must match the order your model was trained with.
+# These are used as a human-readable reference. The model's .pt file also
+# contains embedded class names (model.names), which take priority in inference.
+
+pothole
+alligator_crack
+cracks
+pumping_and_depression

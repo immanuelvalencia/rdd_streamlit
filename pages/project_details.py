@@ -3,6 +3,8 @@ import pandas as pd
 import os
 import database as db
 import mock_ai
+from ai.yolov11_inference import is_model_available
+from ai import processor as ai_processor
 import time
 import re
 from collections import defaultdict
@@ -167,22 +169,31 @@ with tab_gallery:
     if media_df.empty:
         st.info("No media yet — click **⬆️ Upload Media** above to add files.")
     else:
+        show_detections = st.checkbox("🔍 Show AI Detections (Bounding Boxes)", value=True, help="Toggle between original images and AI-annotated images with boxes.")
+        
         for group_key, rows in media_groups.items():
             if group_key.startswith("single_"):
                 row = rows[0]
                 fp = row.get('file_path', '')
                 is_image = fp and any(fp.lower().split('?')[0].endswith(e) for e in ('.png', '.jpg', '.jpeg'))
                 label = f"📄 {row['filename']}  |  {row['status'].capitalize()}"
+                
                 with st.expander(label, expanded=False):
                     st.caption(f"Uploaded: {row['uploaded_at']}")
                     if is_image:
-                        st.image(signed_image_url(fp), width="stretch")
+                        display_path = fp
+                        if show_detections and row['status'] == 'completed':
+                            # Try to show annotated image
+                            display_path = f"projects/{proj_id}/detections/{row['id']}/annotated.jpg"
+                        
+                        st.image(signed_image_url(display_path), width="stretch")
                     else:
                         st.info("🎬 Video file — preview not available.")
             else:
                 statuses = {r['status'] for r in rows}
                 overall = "pending" if "pending" in statuses else "completed"
                 label = f"📂 {group_key} ({len(rows)} images)  |  {overall.capitalize()}"
+                
                 with st.expander(label, expanded=False):
                     cols = st.columns(3)
                     for idx, row in enumerate(rows):
@@ -192,7 +203,12 @@ with tab_gallery:
                             fp = row.get('file_path', '')
                             is_image = fp and any(fp.lower().split('?')[0].endswith(e) for e in ('.png', '.jpg', '.jpeg'))
                             if is_image:
-                                st.image(signed_image_url(fp), width="stretch")
+                                display_path = fp
+                                if show_detections and row['status'] == 'completed':
+                                    display_path = f"projects/{proj_id}/detections/{row['id']}/annotated.jpg"
+                                
+                                st.image(signed_image_url(display_path), width="stretch")
+
 
 # ── TAB 2: RUN AI MODEL ───────────────────────────────────────────────────────
 with tab_run:
@@ -202,7 +218,18 @@ with tab_run:
     elif media_df.empty:
         st.info("Upload media first — click **⬆️ Upload Media** above.")
     else:
-        model_choice = st.selectbox("Select AI Model", ["YOLOv8 - Default", "Faster R-CNN", "Custom Model"])
+        model_available = is_model_available()
+        model_options = ["YOLOv11 - Road Damage", "Mock (Demo only)"]
+        model_choice = st.selectbox(
+            "Select AI Model",
+            model_options,
+            help="YOLOv11 requires best.pt in models/yolov11/weights/"
+        )
+        if model_choice == "YOLOv11 - Road Damage" and not model_available:
+            st.warning("⚠️ Model weights not found at `models/yolov11/weights/best.pt`. Will fall back to mock mode.")
+        elif model_choice == "YOLOv11 - Road Damage":
+            st.success("✅ YOLOv11 model ready.")
+
         pending_media = media_df[media_df['status'] == 'pending']
 
         if pending_media.empty:
@@ -238,10 +265,35 @@ with tab_run:
                     selected_ids = []
                     for key in selected_keys:
                         selected_ids.extend(batch_mapping[key])
-                    with st.spinner(f"Processing {len(selected_ids)} file(s) using {model_choice}..."):
-                        for m_id in selected_ids:
+
+                    use_real_model = is_model_available() and model_choice == "YOLOv11 - Road Damage"
+
+                    progress = st.progress(0, text="Starting...")
+                    errors = []
+
+                    for i, m_id in enumerate(selected_ids):
+                        progress.progress((i) / len(selected_ids), text=f"Processing {i+1}/{len(selected_ids)}...")
+                        media_row = media_df[media_df['id'] == m_id].iloc[0]
+
+                        if use_real_model:
+                            result = ai_processor.process_media(
+                                media_id=m_id,
+                                project_id=proj_id,
+                                file_path=media_row['file_path'],
+                            )
+                            if not result['success']:
+                                errors.append(f"{media_row['filename']}: {result['error']}")
+                        else:
                             mock_ai.process_media(m_id)
-                    st.success("Processing complete! Check the 🤖 AI Detections tab for results.")
+
+                    progress.progress(1.0, text="Done!")
+
+                    if errors:
+                        st.warning(f"Completed with {len(errors)} error(s):")
+                        for e in errors:
+                            st.caption(f"⚠️ {e}")
+                    else:
+                        st.success(f"✅ {len(selected_ids)} file(s) processed! Check the 🤖 AI Detections tab.")
                     time.sleep(1)
                     st.rerun()
                 else:
