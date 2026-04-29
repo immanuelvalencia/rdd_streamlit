@@ -3,9 +3,17 @@ import pandas as pd
 import os
 import database as db
 import mock_ai
+import time
+import re
+from collections import defaultdict
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+@st.cache_data(ttl=3300)
+def signed_image_url(file_path: str) -> str:
+    """Returns a signed URL for display. Cached 55 min to minimise API calls."""
+    return db.create_signed_url(file_path)
 
 if 'target_project' in st.session_state:
     st.query_params["id"] = st.session_state.target_project
@@ -32,12 +40,12 @@ if projects_df.empty or proj_id not in projects_df['id'].astype(str).values:
 selected_proj_row = projects_df[projects_df['id'].astype(str) == str(proj_id)].iloc[0]
 user_id = selected_proj_row.get('user_id')
 
-name = selected_proj_row.get('name', 'Unnamed Project')
-street = selected_proj_row.get('street', 'N/A')
-city = selected_proj_row.get('city', 'N/A')
-region = selected_proj_row.get('region', 'N/A')
-lat = selected_proj_row.get('latitude')
-lon = selected_proj_row.get('longitude')
+name     = selected_proj_row.get('name', 'Unnamed Project')
+street   = selected_proj_row.get('street', 'N/A')
+city     = selected_proj_row.get('city', 'N/A')
+region   = selected_proj_row.get('region', 'N/A')
+lat      = selected_proj_row.get('latitude')
+lon      = selected_proj_row.get('longitude')
 
 creator = selected_proj_row.get('creator_name')
 if pd.isna(creator) or creator is None:
@@ -46,6 +54,8 @@ if pd.isna(creator) or creator is None:
 created_at = str(selected_proj_row.get('created_at', ''))
 if 'T' in created_at:
     created_at = created_at.split('T')[0]
+
+# ── Dialogs ───────────────────────────────────────────────────────────────────
 
 @st.dialog("Delete Project")
 def delete_project_dialog(p_id, p_name):
@@ -57,7 +67,49 @@ def delete_project_dialog(p_id, p_name):
         st.query_params.clear()
         st.switch_page("pages/projects.py")
 
-col_info, col_btn = st.columns([4, 1])
+@st.dialog("Upload Media", width="large")
+def upload_media_dialog(p_id):
+    upload_type = st.radio("Media Type", ["Image", "Video"], horizontal=True)
+
+    if upload_type == "Image":
+        uploaded_files = st.file_uploader(
+            "Choose image(s)", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True
+        )
+        if uploaded_files:
+            st.caption(f"{len(uploaded_files)} file(s) selected — {'batch upload' if len(uploaded_files) > 1 else 'single upload'}")
+            if st.button("⬆️ Upload Images", type="primary", width="stretch"):
+                with st.spinner("Uploading to Supabase Storage..."):
+                    is_batch = len(uploaded_files) > 1
+                    batch_ts = int(time.time())
+                    sub_folder = f"batch_{batch_ts}" if is_batch else None
+                    batch_prefix = f"[Batch {batch_ts}] " if is_batch else ""
+                    for f in uploaded_files:
+                        db.add_media(
+                            project_id=p_id,
+                            filename=batch_prefix + f.name,
+                            file_bytes=f.getbuffer().tobytes(),
+                            sub_folder=sub_folder,
+                        )
+                st.success(f"✅ {len(uploaded_files)} image(s) uploaded!")
+                time.sleep(1)
+                st.rerun()
+    else:
+        uploaded_file = st.file_uploader("Choose a video", type=['mp4', 'avi', 'mov'])
+        if uploaded_file:
+            if st.button("⬆️ Upload Video", type="primary", width="stretch"):
+                with st.spinner("Uploading video to Supabase Storage..."):
+                    db.add_media(
+                        project_id=p_id,
+                        filename=uploaded_file.name,
+                        file_bytes=uploaded_file.getbuffer().tobytes(),
+                    )
+                st.success("✅ Video uploaded!")
+                time.sleep(1)
+                st.rerun()
+
+# ── Project Header ────────────────────────────────────────────────────────────
+
+col_info, col_actions = st.columns([4, 1])
 
 with col_info:
     st.markdown(f"## 📁 {name}")
@@ -66,71 +118,210 @@ with col_info:
         st.write(f"**Coordinates:** {lat:.5f}, {lon:.5f}")
     st.write(f"**Created By:** {creator} on {created_at}")
 
-with col_btn:
-    st.write("") 
+with col_actions:
     st.write("")
-    if st.session_state.user and st.session_state.user.id == user_id:
-        if st.button("🗑️ Delete Project", type="primary", use_container_width=True):
-            delete_project_dialog(proj_id, name)
+    st.write("")
+    if st.session_state.user:
+        if st.button("⬆️ Upload Media", type="primary", width="stretch"):
+            upload_media_dialog(proj_id)
+        if st.session_state.user.id == user_id:
+            if st.button("🗑️ Delete Project", width="stretch"):
+                delete_project_dialog(proj_id, name)
 
 st.divider()
 
-tab1, tab2 = st.tabs(["Media Gallery & Detections", "Upload New Media"])
+# ── Shared data fetched once, used across all tabs ────────────────────────────
 
-with tab1:
-    st.subheader("Media Gallery")
-    media_df = db.get_media_for_project(proj_id)
-    
-    if not media_df.empty:
-        for _, row in media_df.iterrows():
-            with st.expander(f"📄 {row['filename']}  |  Status: {row['status'].capitalize()}", expanded=(row['status']=='pending')):
-                meta_col, det_col = st.columns([1, 2])
-                with meta_col:
-                    st.write(f"**Uploaded:** {row['uploaded_at']}")
-                    if os.path.exists(row['file_path']) and row['file_path'].lower().endswith(('.png', '.jpg', '.jpeg')):
-                        st.image(row['file_path'], width="stretch")
-                
-                with det_col:
-                    if row['status'] == 'completed':
-                        supabase = db.init_connection()
-                        resp = supabase.table("detections").select("damage_type, confidence").eq("media_id", row['id']).execute()
-                        detections_df = pd.DataFrame(resp.data)
-                        
-                        if not detections_df.empty:
-                            st.write("**AI Detections:**")
-                            st.dataframe(
-                                detections_df, 
-                                width="stretch",
-                                hide_index=True,
-                                column_config={
-                                    "damage_type": "Damage Type",
-                                    "confidence": st.column_config.ProgressColumn("Confidence", format="%.2f", min_value=0, max_value=1)
-                                }
-                            )
-                        else:
-                            st.info("No damages detected.")
+media_df = db.get_media_for_project(proj_id)
+
+def build_media_groups(df):
+    groups = defaultdict(list)
+    for _, row in df.iterrows():
+        match = re.match(r'^(\[Batch .*?\])\s*(.*)', row['filename'])
+        groups[match.group(1) if match else f"single_{row['id']}"].append(row)
+    return groups
+
+media_groups = build_media_groups(media_df) if not media_df.empty else {}
+
+def get_project_detections(df):
+    if df.empty:
+        return pd.DataFrame()
+    supabase = db.init_connection()
+    media_ids = df['id'].tolist()
+    resp = supabase.table("detections").select("media_id, damage_type, confidence").in_("media_id", media_ids).execute()
+    det = pd.DataFrame(resp.data)
+    if not det.empty:
+        det = det.merge(df[['id', 'filename']], left_on='media_id', right_on='id', how='left').drop(columns='id')
+    return det
+
+det_df = get_project_detections(media_df)
+
+tab_gallery, tab_run, tab_detections = st.tabs([
+    "📷 Media Gallery",
+    "▶️ Run AI Model",
+    "🤖 AI Detections",
+])
+
+# ── TAB 1: MEDIA GALLERY ─────────────────────────────────────────────────────
+with tab_gallery:
+    if media_df.empty:
+        st.info("No media yet — click **⬆️ Upload Media** above to add files.")
+    else:
+        for group_key, rows in media_groups.items():
+            if group_key.startswith("single_"):
+                row = rows[0]
+                fp = row.get('file_path', '')
+                is_image = fp and any(fp.lower().split('?')[0].endswith(e) for e in ('.png', '.jpg', '.jpeg'))
+                label = f"📄 {row['filename']}  |  {row['status'].capitalize()}"
+                with st.expander(label, expanded=False):
+                    st.caption(f"Uploaded: {row['uploaded_at']}")
+                    if is_image:
+                        st.image(signed_image_url(fp), width="stretch")
                     else:
-                        st.info("Pending AI processing...")
-    else:
-        st.info("No media uploaded for this project yet.")
+                        st.info("🎬 Video file — preview not available.")
+            else:
+                statuses = {r['status'] for r in rows}
+                overall = "pending" if "pending" in statuses else "completed"
+                label = f"📂 {group_key} ({len(rows)} images)  |  {overall.capitalize()}"
+                with st.expander(label, expanded=False):
+                    cols = st.columns(3)
+                    for idx, row in enumerate(rows):
+                        with cols[idx % 3]:
+                            clean = re.sub(r'^\[Batch .*?\]\s*', '', row['filename'])
+                            st.caption(clean)
+                            fp = row.get('file_path', '')
+                            is_image = fp and any(fp.lower().split('?')[0].endswith(e) for e in ('.png', '.jpg', '.jpeg'))
+                            if is_image:
+                                st.image(signed_image_url(fp), width="stretch")
 
-with tab2:
+# ── TAB 2: RUN AI MODEL ───────────────────────────────────────────────────────
+with tab_run:
+    st.subheader("Run AI Model")
     if not st.session_state.user:
-        st.warning("You must be logged in to upload media.")
+        st.warning("You must be logged in to run AI models.")
+    elif media_df.empty:
+        st.info("Upload media first — click **⬆️ Upload Media** above.")
     else:
-        st.subheader("Upload Media")
-        with st.container(border=True):
-            uploaded_file = st.file_uploader("Choose an image or video file", type=['jpg', 'jpeg', 'png', 'mp4'])
-            if uploaded_file is not None:
-                if st.button("Upload & Process", type="primary", width="stretch"):
-                    with st.spinner('Uploading to Supabase and running AI detection...'):
-                        file_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
-                        with open(file_path, "wb") as f:
-                            f.write(uploaded_file.getbuffer())
-                        
-                        media_id = db.add_media(proj_id, uploaded_file.name, file_path)
-                        mock_ai.process_media(media_id)
-                        st.success("File uploaded and processed!")
-                        import time
-                        time.sleep(1)
-                        st.rerun()
+        model_choice = st.selectbox("Select AI Model", ["YOLOv8 - Default", "Faster R-CNN", "Custom Model"])
+        pending_media = media_df[media_df['status'] == 'pending']
+
+        if pending_media.empty:
+            st.info("✅ All media has already been processed. Check the 🤖 AI Detections tab for results.")
+        else:
+            st.write("Select media to process:")
+            media_options = {}
+            batch_mapping = defaultdict(list)
+
+            for _, row in pending_media.iterrows():
+                match = re.match(r'^(\[Batch .*?\])\s*(.*)', row['filename'])
+                if match:
+                    batch_id = match.group(1)
+                    batch_mapping[batch_id].append(row['id'])
+                else:
+                    key = f"single_{row['id']}"
+                    batch_mapping[key].append(row['id'])
+                    media_options[key] = row['filename']
+
+            for batch_id, ids in batch_mapping.items():
+                if not batch_id.startswith("single_"):
+                    media_options[batch_id] = f"{batch_id} ({len(ids)} images)"
+
+            selected_keys = st.multiselect(
+                "Pending Media",
+                options=list(media_options.keys()),
+                format_func=lambda x: media_options[x],
+                default=list(media_options.keys()),
+            )
+
+            if st.button("▶️ Run AI Model", type="primary", width="stretch"):
+                if selected_keys:
+                    selected_ids = []
+                    for key in selected_keys:
+                        selected_ids.extend(batch_mapping[key])
+                    with st.spinner(f"Processing {len(selected_ids)} file(s) using {model_choice}..."):
+                        for m_id in selected_ids:
+                            mock_ai.process_media(m_id)
+                    st.success("Processing complete! Check the 🤖 AI Detections tab for results.")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.warning("Please select at least one media file.")
+
+# ── TAB 3: AI DETECTIONS ─────────────────────────────────────────────────────
+with tab_detections:
+    if det_df.empty:
+        st.info("No AI detections yet. Upload media and run the AI model first.")
+    else:
+        st.subheader("Detections by Upload")
+
+        for group_key, rows in media_groups.items():
+            group_media_ids = [r['id'] for r in rows]
+            group_det = det_df[det_df['media_id'].isin(group_media_ids)]
+            if group_det.empty:
+                continue
+
+            label = (
+                f"📄 {rows[0]['filename']}"
+                if group_key.startswith("single_")
+                else f"📂 {group_key} ({len(rows)} images)"
+            )
+
+            with st.expander(label, expanded=True):
+                summary = (
+                    group_det.groupby('damage_type')['confidence']
+                    .agg(count='count', avg_confidence='mean')
+                    .reset_index()
+                    .sort_values('count', ascending=False)
+                )
+                summary['avg_confidence'] = summary['avg_confidence'].round(3)
+
+                col_tbl, col_chart = st.columns([1, 1])
+                with col_tbl:
+                    st.dataframe(
+                        summary,
+                        hide_index=True,
+                        width="stretch",
+                        column_config={
+                            "damage_type": "Damage Type",
+                            "count": st.column_config.NumberColumn("Count"),
+                            "avg_confidence": st.column_config.ProgressColumn(
+                                "Avg Confidence", format="%.3f", min_value=0, max_value=1
+                            ),
+                        },
+                    )
+                with col_chart:
+                    st.bar_chart(summary.set_index('damage_type')['count'])
+
+        st.divider()
+
+        st.subheader("📊 Project Summary")
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total Media Files", len(media_df))
+        m2.metric("Processed", len(media_df[media_df['status'] == 'completed']))
+        m3.metric("Total Detections", len(det_df))
+
+        st.markdown("**Damage Type Distribution — All Media**")
+        proj_summary = (
+            det_df.groupby('damage_type')['confidence']
+            .agg(count='count', avg_confidence='mean')
+            .reset_index()
+            .sort_values('count', ascending=False)
+        )
+        proj_summary['avg_confidence'] = proj_summary['avg_confidence'].round(3)
+
+        col_ps1, col_ps2 = st.columns([1, 1])
+        with col_ps1:
+            st.dataframe(
+                proj_summary,
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "damage_type": "Damage Type",
+                    "count": st.column_config.NumberColumn("Count"),
+                    "avg_confidence": st.column_config.ProgressColumn(
+                        "Avg Confidence", format="%.3f", min_value=0, max_value=1
+                    ),
+                },
+            )
+        with col_ps2:
+            st.bar_chart(proj_summary.set_index('damage_type')['count'])
