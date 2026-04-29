@@ -1,7 +1,15 @@
+# Core Streamlit & UI
 streamlit
 pandas
 plotly
-pillow
-supabase
 folium
 streamlit-folium
+
+# Supabase & Auth
+supabase
+requests
+
+# AI & Computer Vision
+ultralytics
+opencv-python-headless
+pillow
