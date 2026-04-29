@@ -17,8 +17,9 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-import cv2
-import numpy as np
+# Heavy imports deferred inside functions to prevent top-level crashes on minimal environments
+# import cv2 
+# import numpy as np
 from PIL import Image
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,8 @@ def run_inference(
                           - bbox        ([x1, y1, x2, y2] in pixels)
         annotated_bytes: JPEG bytes of the annotated image with bounding boxes
     """
+    import cv2
+    import numpy as np
     model = load_model()
 
     # Convert bytes → PIL Image
