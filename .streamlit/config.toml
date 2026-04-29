@@ -5,3 +5,10 @@ backgroundColor="#ffffff"
 secondaryBackgroundColor="#f0f2f6"
 textColor="#31333F"
 font="sans serif"
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = false
+
+[browser]
+gatherUsageStats = false

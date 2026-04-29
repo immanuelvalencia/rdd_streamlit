@@ -4,6 +4,16 @@ import database as db
 db.init_db()
 st.set_page_config(page_title="Road Damage Detection", page_icon="🛣️", layout="wide")
 
+# ── HIDE STREAMLIT BRANDING ──────────────────────────────────────────────────
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+    """, unsafe_allow_html=True)
+
+
 if 'user' not in st.session_state:
     user, profile = db.restore_session()
     st.session_state.user = user
