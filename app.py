@@ -9,7 +9,7 @@ st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
+    /* header {visibility: hidden;}  <- Removed so mobile sidebar toggle works */
     </style>
     """, unsafe_allow_html=True)
 

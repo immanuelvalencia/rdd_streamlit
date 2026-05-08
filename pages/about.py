@@ -155,13 +155,6 @@ st.markdown("""
         align-items: flex-start;
         border: 1px solid #e2e8f0;
     }
-    @media (max-width: 768px) {
-        .profile-card {
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-        }
-    }
     .profile-img-container {
         flex-shrink: 0;
         position: relative;
@@ -250,6 +243,61 @@ st.markdown("""
         font-weight: 600;
         letter-spacing: 0.05em;
         color: #64748b;
+    }
+
+    /* Responsive Adjustments for Mobile */
+    @media (max-width: 768px) {
+        .hero-title {
+            font-size: 2.2rem;
+        }
+        .hero-subtitle {
+            font-size: 1.05rem;
+        }
+        .hero-section {
+            padding: 2.5rem 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .section-header {
+            font-size: 1.5rem;
+            margin-top: 2rem;
+        }
+        .collab-card {
+            height: auto;
+            min-height: 220px;
+            padding: 1.5rem;
+        }
+        .team-card {
+            height: auto;
+            min-height: 220px;
+            padding: 1.25rem;
+        }
+        .profile-card {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 1.5rem;
+            gap: 1rem;
+        }
+        .profile-photo {
+            width: 140px;
+            height: 140px;
+        }
+        .bulsu-logo-overlay {
+            width: 45px;
+            height: 45px;
+            bottom: -5px;
+            right: 0px;
+        }
+        .profile-name {
+            font-size: 1.25rem;
+        }
+        .profile-title {
+            font-size: 0.95rem;
+        }
+        .profile-list li {
+            text-align: left;
+            font-size: 0.9rem;
+        }
     }
 </style>
 """, unsafe_allow_html=True)

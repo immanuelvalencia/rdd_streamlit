@@ -38,7 +38,7 @@ def restore_session():
 
 # --- Auth ---
 
-def sign_up(email, password, name, position):
+def sign_up(email, password, name, position, institution=""):
     supabase = init_connection()
     res = supabase.auth.sign_up({
         "email": email, 
@@ -46,19 +46,27 @@ def sign_up(email, password, name, position):
         "options": {
             "data": {
                 "name": name,
-                "position": position
+                "position": position,
+                "institution": institution
             }
         }
     })
     if res and res.user:
         try:
-            supabase.table("profiles").update({
+            update_data = {
                 "name": name, 
                 "position": position
-            }).eq("id", res.user.id).execute()
+            }
+            if institution:
+                update_data["institution"] = institution
+            supabase.table("profiles").update(update_data).eq("id", res.user.id).execute()
         except Exception:
             pass
     return res
+
+def reset_password(email):
+    supabase = init_connection()
+    return supabase.auth.reset_password_email(email)
 
 def get_profile(user_id):
     supabase = init_connection()
@@ -197,13 +205,23 @@ def create_signed_url(file_path: str, expires_in: int = 3600) -> str:
     except Exception:
         return file_path  # fallback to original URL
 
-def upload_detection_file(project_id: str, media_id: str, filename: str, file_bytes: bytes, content_type: str = "image/jpeg") -> str:
+def upload_detection_file(project_id: str, original_filename: str, model_name: str, file_bytes: bytes, content_type: str = "image/jpeg") -> str:
     """
-    Uploads a detection result file (annotated image, JSON, etc.) to:
-      projects/<project_id>/detections/<media_id>/<filename>
+    Uploads a detection result file to:
+      projects/<project_id>/annotated/<model_name>/<filename>_<model_name>.<ext>
     Returns the public URL.
     """
-    storage_path = f"projects/{project_id}/detections/{media_id}/{filename}"
+    import re
+    # Remove [Batch xxx] prefix if present
+    clean_name = re.sub(r'^\[Batch \d+\]\s*', '', original_filename)
+    
+    if '.' in clean_name:
+        base_name, ext = clean_name.rsplit('.', 1)
+        new_filename = f"{base_name}_{model_name}.{ext}"
+    else:
+        new_filename = f"{clean_name}_{model_name}.jpg"
+
+    storage_path = f"projects/{project_id}/annotated/{model_name}/{new_filename}"
     return upload_to_storage(storage_path, file_bytes, content_type)
 
 # --- Media ---
@@ -273,9 +291,41 @@ def get_media_for_project(project_id):
         df = pd.DataFrame(columns=["id", "project_id", "filename", "file_path", "status", "uploaded_at"])
     return df
 
-def update_media_status(media_id, status):
+def update_media_status(media_id, status, annotated_url=None):
     supabase = init_connection()
-    supabase.table("media").update({"status": status}).eq("id", media_id).execute()
+    update_data = {"status": status}
+    if annotated_url:
+        update_data["storage_path"] = annotated_url
+    supabase.table("media").update(update_data).eq("id", media_id).execute()
+
+def delete_media_batch(media_ids):
+    if not media_ids:
+        return
+    supabase = init_connection()
+    
+    # 1. Collect all storage paths to delete raw files and detection files
+    resp = supabase.table("media").select("id, file_path, project_id").in_("id", media_ids).execute()
+    storage_paths = []
+    for m in resp.data:
+        fp = m.get("file_path", "")
+        pid = m.get("project_id", "")
+        mid = m.get("id", "")
+        if fp:
+            path = _extract_storage_path(fp)
+            if path:
+                storage_paths.append(path)
+        if pid and mid:
+            # Also try to delete the annotated image
+            storage_paths.append(f"projects/{pid}/detections/{mid}/annotated.jpg")
+            
+    if storage_paths:
+        try:
+            supabase.storage.from_(STORAGE_BUCKET).remove(storage_paths)
+        except Exception:
+            pass
+
+    # 2. Delete the DB records
+    supabase.table("media").delete().in_("id", media_ids).execute()
 
 # --- Detections ---
 
@@ -284,11 +334,50 @@ def add_detection(media_id, damage_type, confidence):
     data = {"media_id": media_id, "damage_type": damage_type, "confidence": confidence}
     supabase.table("detections").insert(data).execute()
 
+def delete_detections_for_media(media_ids: list, project_id: str = None):
+    """
+    Deletes all detection rows for the given media IDs, removes annotated
+    images from Storage (if project_id provided), and resets media status
+    back to 'pending' so they can be re-processed.
+    """
+    if not media_ids:
+        return
+    supabase = init_connection()
+
+    # Remove annotated images from Storage (legacy and new)
+    if project_id:
+        paths_to_remove = []
+        # Legacy paths
+        for mid in media_ids:
+            paths_to_remove.append(f"projects/{project_id}/detections/{mid}/annotated.jpg")
+            
+        # For the new paths, we need to find them from the DB first
+        res = supabase.table("media").select("storage_path").in_("id", media_ids).execute()
+        for r in res.data:
+            sp = r.get("storage_path")
+            if sp:
+                # Extract relative path from URL or use as is
+                extracted = _extract_storage_path(sp)
+                if extracted:
+                    paths_to_remove.append(extracted)
+
+        if paths_to_remove:
+            try:
+                supabase.storage.from_(STORAGE_BUCKET).remove(paths_to_remove)
+            except Exception:
+                pass  # non-fatal
+
+    # Delete detection rows
+    supabase.table("detections").delete().in_("media_id", media_ids).execute()
+
+    # Reset media status back to pending
+    supabase.table("media").update({"status": "pending"}).in_("id", media_ids).execute()
+
 def get_all_analytics():
     # Public access: Fetch all analytics
     supabase = init_connection()
     
-    projects_resp = supabase.table("projects").select("id, name").execute()
+    projects_resp = supabase.table("projects").select("id, name, street, city, region, latitude, longitude").execute()
     media_resp = supabase.table("media").select("id, project_id, status").execute()
     detections_resp = supabase.table("detections").select("media_id, damage_type, confidence").execute()
     
@@ -297,7 +386,8 @@ def get_all_analytics():
     det_df = pd.DataFrame(detections_resp.data)
     
     if proj_df.empty:
-        return pd.DataFrame(columns=['project_id', 'project_name', 'media_id', 'status', 'damage_type', 'confidence'])
+        return pd.DataFrame(columns=['project_id', 'project_name', 'street', 'city', 'region',
+                                     'latitude', 'longitude', 'media_id', 'status', 'damage_type', 'confidence'])
         
     proj_df = proj_df.rename(columns={"id": "project_id", "name": "project_name"})
     
