@@ -60,6 +60,24 @@ button[kind="borderless"]:hover {
     border-color: #4f46e5 !important;
     color: #4f46e5 !important;
 }
+
+/* Fixed-height Project Thumbnails */
+[data-testid="stVerticalBlock"] > div:has(img) img {
+    height: 180px !important;
+    object-fit: cover !important;
+    border-radius: 8px !important;
+}
+.thumb-placeholder {
+    height: 180px;
+    background: #f3f4f6;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -174,9 +192,9 @@ else:
                         thumb_url = signed_image_url(image_rows.iloc[0]['file_path'])
                         st.image(thumb_url, width="stretch")
                     else:
-                        st.info("📁 Media Uploaded")
+                        st.markdown('<div class="thumb-placeholder">📂</div>', unsafe_allow_html=True)
                 else:
-                    st.info("📁 Empty Project")
+                    st.markdown('<div class="thumb-placeholder">📁</div>', unsafe_allow_html=True)
 
                 st.markdown(f"#### {row.get('name', 'Unnamed Project')}")
 
