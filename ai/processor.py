@@ -1,13 +1,12 @@
 """
 Real AI Processor
 =================
-Replaces mock_ai.py when a YOLO model is available.
 
 Workflow per media item:
   1. Download raw image from Supabase Storage (via signed URL)
   2. Run inference with the chosen model (yolov11 | yolov8seg)
   3. Save detections to the `detections` table
-  4. Upload the annotated image to  projects/<project_id>/detections/<media_id>/annotated.jpg
+  4. Upload the annotated image to model-specific paths
   5. Mark media status as 'completed'
 """
 
@@ -45,7 +44,7 @@ def process_media(
         project_id:  UUID of the parent project
         file_path:   Supabase public/stored URL for the raw image
         original_filename: The original filename from the database
-        model_type:  Which model to use — 'yolov11' or 'yolov8seg'
+        model_type:  Which model to use - 'yolov11' or 'yolov8seg'
 
     Returns:
         dict with keys: success (bool), detections (list), error (str|None)

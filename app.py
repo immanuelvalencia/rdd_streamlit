@@ -9,10 +9,8 @@ st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    /* header {visibility: hidden;}  <- Removed so mobile sidebar toggle works */
     </style>
     """, unsafe_allow_html=True)
-
 
 if 'user' not in st.session_state:
     user, profile = db.restore_session()

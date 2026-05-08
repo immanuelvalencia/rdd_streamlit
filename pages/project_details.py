@@ -5,7 +5,7 @@ import io
 import zipfile
 import requests as _requests
 import database as db
-import mock_ai
+
 from ai.yolov11_inference import is_model_available as yolov11_available
 from ai.yolov8seg_inference import is_model_available as yolov8seg_available
 from ai import processor as ai_processor
@@ -572,18 +572,16 @@ with tab_run:
                         progress.progress(i / len(selected_ids), text=f"Processing {i+1}/{len(selected_ids)}...")
                         media_row = media_df[media_df['id'] == m_id].iloc[0]
 
-                        if use_real_model:
-                            result = ai_processor.process_media(
-                                media_id=m_id,
-                                project_id=proj_id,
-                                file_path=media_row['file_path'],
-                                original_filename=media_row['filename'],
-                                model_type=chosen_model_type,
-                            )
-                            if not result['success']:
-                                errors.append(f"{media_row['filename']}: {result['error']}")
-                        else:
-                            mock_ai.process_media(m_id)
+                        # Always use real model now
+                        result = ai_processor.process_media(
+                            media_id=m_id,
+                            project_id=proj_id,
+                            file_path=media_row['file_path'],
+                            original_filename=media_row['filename'],
+                            model_type=chosen_model_type,
+                        )
+                        if not result['success']:
+                            errors.append(f"{media_row['filename']}: {result['error']}")
 
                     progress.progress(1.0, text="Done!")
 

@@ -78,9 +78,13 @@ def get_profile(user_id):
         pass
     return None
 
-def update_profile(user_id, name, position):
+def update_profile(user_id, name, position, institution):
     supabase = init_connection()
-    supabase.table("profiles").update({"name": name, "position": position}).eq("id", user_id).execute()
+    supabase.table("profiles").update({
+        "name": name, 
+        "position": position,
+        "institution": institution
+    }).eq("id", user_id).execute()
 
 def sign_in(email, password):
     supabase = init_connection()

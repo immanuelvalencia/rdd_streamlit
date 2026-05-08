@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import os
 import database as db
-import mock_ai
 import folium
 from streamlit_folium import st_folium
 
