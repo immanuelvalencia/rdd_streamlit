@@ -4,6 +4,36 @@ import os
 import database as db
 import folium
 from streamlit_folium import st_folium
+import requests
+
+@st.cache_data(ttl=3600)
+def search_address(query: str):
+    if not query or not query.strip():
+        return []
+    url = "https://nominatim.openstreetmap.org/search"
+    params = {
+        "q": query,
+        "format": "json",
+        "limit": 5,
+        "countrycodes": "ph"
+    }
+    headers = {
+        "User-Agent": "RoadDamageDetectionDashboard/1.0"
+    }
+    try:
+        resp = requests.get(url, params=params, headers=headers, timeout=10)
+        resp.raise_for_status()
+        results = resp.json()
+        return [
+            {
+                "display_name": r.get("display_name"),
+                "lat": float(r.get("lat")),
+                "lon": float(r.get("lon"))
+            }
+            for r in results
+        ]
+    except Exception:
+        return []
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -97,6 +127,11 @@ def create_project_dialog():
 
     name = st.text_input("Project Name *")
 
+    if "dialog_street" not in st.session_state:
+        st.session_state.dialog_street = ""
+    if "last_placed_address" not in st.session_state:
+        st.session_state.last_placed_address = None
+
     col1, col2, col3 = st.columns(3)
     with col1:
         regions = list(db.PHILIPPINES_LOCATIONS.keys())
@@ -108,7 +143,29 @@ def create_project_dialog():
         cities = db.PHILIPPINES_LOCATIONS[region][province]
         city = st.selectbox("City / Municipality", cities)
 
-    street = st.text_input("Street Address")
+    street = st.text_input("Street Address", value=st.session_state.dialog_street)
+    if street != st.session_state.dialog_street:
+        st.session_state.dialog_street = street
+        st.session_state.last_placed_address = None  # Reset so suggestions can trigger updates again
+        st.rerun(scope="fragment")
+
+    if st.session_state.dialog_street:
+        suggestions = search_address(st.session_state.dialog_street)
+        if suggestions:
+            suggestion_names = ["Select matching address to place pin..."] + [s["display_name"] for s in suggestions]
+            selected_name = st.selectbox(
+                "Matching Addresses (Click to place pin):",
+                options=suggestion_names,
+                key="street_suggestions"
+            )
+            if selected_name != "Select matching address to place pin...":
+                if selected_name != st.session_state.last_placed_address:
+                    match = next((s for s in suggestions if s["display_name"] == selected_name), None)
+                    if match:
+                        st.session_state.dialog_pin = {"lat": match["lat"], "lon": match["lon"]}
+                        st.session_state.dialog_street = match["display_name"].split(",")[0].strip()
+                        st.session_state.last_placed_address = selected_name
+                        st.rerun(scope="fragment")
 
     st.write("📍 **Pin Location on Map**")
 
@@ -155,6 +212,8 @@ def create_project_dialog():
                 name, region, province, city, street, lat, lon, st.session_state.user.id
             )
             st.session_state.dialog_pin = None  # clear for next time
+            st.session_state.dialog_street = ""  # clear street
+            st.session_state.last_placed_address = None  # clear last placed address
             st.success(f"Project '{name}' created!")
             st.rerun()
 
