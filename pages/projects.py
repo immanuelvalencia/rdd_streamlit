@@ -8,13 +8,16 @@ from streamlit_folium import st_folium
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
 @st.cache_data(ttl=3300)
 def signed_image_url(file_path: str) -> str:
     """Returns a signed URL for display. Cached for 55 min to minimise API calls."""
     return db.create_signed_url(file_path)
 
+
 # --- BUTTON STYLING ---
-st.markdown("""
+st.markdown(
+    """
 <style>
 /* Primary buttons — vibrant indigo */
 button[kind="primary"] {
@@ -78,11 +81,14 @@ button[kind="borderless"]:hover {
     margin-bottom: 1rem;
 }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 col_title, col_btn = st.columns([4, 1])
 with col_title:
     st.title("📂 Projects")
+
 
 # --- MODAL: CREATE PROJECT ---
 @st.dialog("Create New Project", width="large")
@@ -91,17 +97,16 @@ def create_project_dialog():
 
     name = st.text_input("Project Name *")
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
-        region = st.selectbox("Region", ["NCR", "Region III", "Region IV-A", "Region VII", "Region XI"])
+        regions = list(db.PHILIPPINES_LOCATIONS.keys())
+        region = st.selectbox("Region", regions)
     with col2:
-        cities = []
-        if region == "NCR": cities = ["Manila", "Quezon City", "Makati", "Taguig"]
-        elif region == "Region III": cities = ["San Fernando", "Angeles", "Olongapo"]
-        elif region == "Region IV-A": cities = ["Antipolo", "Dasmarinas", "Santa Rosa"]
-        elif region == "Region VII": cities = ["Cebu City", "Mandaue", "Lapu-Lapu"]
-        elif region == "Region XI": cities = ["Davao City", "Tagum", "Digos"]
-        city = st.selectbox("City", cities)
+        provinces = list(db.PHILIPPINES_LOCATIONS[region].keys())
+        province = st.selectbox("Province", provinces)
+    with col3:
+        cities = db.PHILIPPINES_LOCATIONS[region][province]
+        city = st.selectbox("City / Municipality", cities)
 
     street = st.text_input("Street Address")
 
@@ -146,10 +151,13 @@ def create_project_dialog():
         if not name:
             st.error("Project Name is required.")
         else:
-            db.add_project(name, region, city, street, lat, lon, st.session_state.user.id)
+            db.add_project(
+                name, region, province, city, street, lat, lon, st.session_state.user.id
+            )
             st.session_state.dialog_pin = None  # clear for next time
             st.success(f"Project '{name}' created!")
             st.rerun()
+
 
 with col_btn:
     if st.session_state.user:
@@ -167,7 +175,9 @@ st.divider()
 try:
     projects_df = db.get_projects()
 except Exception as e:
-    st.error(f"Failed to fetch projects from Supabase. Ensure your secrets are configured. Error: {e}")
+    st.error(
+        f"Failed to fetch projects from Supabase. Ensure your secrets are configured. Error: {e}"
+    )
     st.stop()
 
 # --- GRID VIEW ---
@@ -180,41 +190,56 @@ else:
         col = cols[index % 3]
         with col:
             with st.container(border=True):
-                media_df = db.get_media_for_project(row['id'])
+                media_df = db.get_media_for_project(row["id"])
                 if not media_df.empty:
                     image_rows = media_df[
-                        media_df['file_path'].str.lower()
-                        .str.split('?').str[0]
-                        .str.endswith(('.png', '.jpg', '.jpeg'), na=False)
+                        media_df["file_path"]
+                        .str.lower()
+                        .str.split("?")
+                        .str[0]
+                        .str.endswith((".png", ".jpg", ".jpeg"), na=False)
                     ]
                     if not image_rows.empty:
-                        thumb_url = signed_image_url(image_rows.iloc[0]['file_path'])
+                        thumb_url = signed_image_url(image_rows.iloc[0]["file_path"])
                         st.image(thumb_url, width="stretch")
                     else:
-                        st.markdown('<div class="thumb-placeholder">📂</div>', unsafe_allow_html=True)
+                        st.markdown(
+                            '<div class="thumb-placeholder">📂</div>',
+                            unsafe_allow_html=True,
+                        )
                 else:
-                    st.markdown('<div class="thumb-placeholder">📁</div>', unsafe_allow_html=True)
+                    st.markdown(
+                        '<div class="thumb-placeholder">📁</div>',
+                        unsafe_allow_html=True,
+                    )
 
                 st.markdown(f"#### {row.get('name', 'Unnamed Project')}")
 
-                street = row.get('street', 'N/A')
-                city = row.get('city', 'N/A')
-                region = row.get('region', 'N/A')
-                st.caption(f"📍 {street}, {city}, {region}")
+                street = row.get("street", "")
+                city = row.get("city", "")
+                province = row.get("province", "")
+                region = row.get("region", "")
+                loc_parts = [street, city, province, region]
+                loc_str = ", ".join([str(p).strip() for p in loc_parts if pd.notnull(p) and str(p).strip() and str(p).strip() != "N/A"])
+                st.caption(f"📍 {loc_str or 'N/A'}")
 
-                lat = row.get('latitude')
-                lon = row.get('longitude')
+                lat = row.get("latitude")
+                lon = row.get("longitude")
                 if pd.notnull(lat) and pd.notnull(lon):
                     st.caption(f"🧭 {lat:.4f}, {lon:.4f}")
 
-                created_str = str(row['created_at'])
-                if 'T' in created_str:
-                    created_str = created_str.split('T')[0] + " " + created_str.split('T')[1][:5]
+                created_str = str(row["created_at"])
+                if "T" in created_str:
+                    created_str = (
+                        created_str.split("T")[0] + " " + created_str.split("T")[1][:5]
+                    )
                 st.caption(f"🕒 {created_str}")
 
-                creator = row.get('creator_email', 'Unknown')
+                creator = row.get("creator_email", "Unknown")
                 st.caption(f"👤 Created by: {creator}")
 
-                if st.button("Open Project →", key=f"open_{row['id']}", width="stretch"):
-                    st.session_state.target_project = row['id']
+                if st.button(
+                    "Open Project →", key=f"open_{row['id']}", width="stretch"
+                ):
+                    st.session_state.target_project = row["id"]
                     st.switch_page("pages/project_details.py")

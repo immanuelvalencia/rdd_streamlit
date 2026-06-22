@@ -8,14 +8,17 @@ st.set_page_config(page_title="About RCMED", page_icon="🏢", layout="wide")
 ASSETS_DIR = "assets"
 os.makedirs(ASSETS_DIR, exist_ok=True)
 
+
 def get_base64_image(image_path):
     if os.path.exists(image_path):
         with open(image_path, "rb") as f:
             return base64.b64encode(f.read()).decode()
     return None
 
+
 # ── CUSTOM CSS ───────────────────────────────────────────────────────────────
-st.markdown("""
+st.markdown(
+    """
 <style>
     /* Hero Section */
     .hero-section {
@@ -300,10 +303,13 @@ st.markdown("""
         }
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # ── HERO SECTION ─────────────────────────────────────────────────────────────
-st.markdown("""
+st.markdown(
+    """
 <div class="hero-section">
     <div class="hero-title">RCMED</div>
     <div class="hero-subtitle">
@@ -313,40 +319,63 @@ st.markdown("""
         A Collaboration between TUP, DLSU, BulSU, CHED, and DPWH
     </p>
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # ── ABOUT THE PROJECT ────────────────────────────────────────────────────────
-st.markdown('<div class="section-header">About the Project</div>', unsafe_allow_html=True)
-st.write("""
+st.markdown(
+    '<div class="section-header">About the Project</div>', unsafe_allow_html=True
+)
+st.write(
+    """
     RCMED is a technology-driven system designed to automate and enhance road pavement damage detection, 
     classification, and evaluation across the Philippines. By integrating deep learning models with geotagged 
     mobile data collection, the platform provides a more objective and efficient approach to road condition 
     assessment. This project supports faster decision-making for government agencies, ensuring that road maintenance 
     and infrastructure improvements are guided by accurate, real-time data.
-""")
+"""
+)
 
 # ── PROJECT COLLABORATION ────────────────────────────────────────────────────
-st.markdown('<div class="section-header">Project Collaboration</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-header">Project Collaboration</div>', unsafe_allow_html=True
+)
 
 cols_p = st.columns(5)
 partners = [
-    {"name": "Technological University of the Philippines", "id": "tup", "label": "TUP Logo"},
+    {
+        "name": "Technological University of the Philippines",
+        "id": "tup",
+        "label": "TUP Logo",
+    },
     {"name": "De La Salle University", "id": "dlsu", "label": "DLSU Logo"},
     {"name": "Bulacan State University", "id": "bulsu", "label": "BulSU Logo"},
     {"name": "Commission on Higher Education", "id": "ched", "label": "CHED Logo"},
-    {"name": "Department of Public Works and Highways", "id": "dpwh", "label": "DPWH Logo"}
+    {
+        "name": "Department of Public Works and Highways",
+        "id": "dpwh",
+        "label": "DPWH Logo",
+    },
 ]
 
 for i, partner in enumerate(partners):
     with cols_p[i]:
         b64 = get_base64_image(os.path.join(ASSETS_DIR, f"{partner['id']}_logo.png"))
-        logo_html = f'<div class="logo-container"><img src="data:image/png;base64,{b64}" class="logo-img"></div>' if b64 else f'<div class="logo-container"><div class="logo-placeholder">{partner["label"]}</div></div>'
-        st.markdown(f"""
+        logo_html = (
+            f'<div class="logo-container"><img src="data:image/png;base64,{b64}" class="logo-img"></div>'
+            if b64
+            else f'<div class="logo-container"><div class="logo-placeholder">{partner["label"]}</div></div>'
+        )
+        st.markdown(
+            f"""
         <div class="collab-card">
             {logo_html}
             <div class="collab-name">{partner['name']}</div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
 # ── PROJECT TEAM ─────────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">Project Team</div>', unsafe_allow_html=True)
@@ -354,27 +383,46 @@ st.markdown('<div class="section-header">Project Team</div>', unsafe_allow_html=
 project_team = [
     {"name": "Dr. Ryan Reyes", "role": "Project Leader", "id": "ryan_reyes"},
     {"name": "Dr. Ira Estropia", "role": "Project Member", "id": "ira_estropia"},
-    {"name": "Engr. Immanuel Jose C. Valencia", "role": "Project Member", "id": "immanuel_valencia"},
+    {
+        "name": "Engr. Immanuel Jose C. Valencia",
+        "role": "Project Member",
+        "id": "immanuel_valencia",
+    },
     {"name": "Dr. Lean Karlo Tolentino", "role": "Project Member", "id": "lean_karlo"},
     {"name": "Engr. Mark Melgrito", "role": "Project Member", "id": "mark_melgrito"},
-    {"name": "Engr. Jessica Velasco", "role": "Project Member", "id": "jessica_velasco"},
-    {"name": "Engr. Christopher Cunanan", "role": "PhD Graduate Student Collaborator", "id": "christopher_cunanan"},
+    {
+        "name": "Engr. Jessica Velasco",
+        "role": "Project Member",
+        "id": "jessica_velasco",
+    },
+    {
+        "name": "Engr. Christopher Cunanan",
+        "role": "PhD Graduate Student Collaborator",
+        "id": "christopher_cunanan",
+    },
 ]
 
-rows = [project_team[i:i+4] for i in range(0, len(project_team), 4)]
+rows = [project_team[i : i + 4] for i in range(0, len(project_team), 4)]
 for row in rows:
     cols = st.columns(4)
     for i, member in enumerate(row):
         with cols[i]:
             b64 = get_base64_image(os.path.join(ASSETS_DIR, f"{member['id']}.png"))
-            photo_html = f'<img src="data:image/png;base64,{b64}" class="team-photo">' if b64 else '<div style="color:#cbd5e1; font-size:2rem;">👤</div>'
-            st.markdown(f"""
+            photo_html = (
+                f'<img src="data:image/png;base64,{b64}" class="team-photo">'
+                if b64
+                else '<div style="color:#cbd5e1; font-size:2rem;">👤</div>'
+            )
+            st.markdown(
+                f"""
             <div class="team-card">
                 <div class="team-photo-container">{photo_html}</div>
                 <div class="team-name">{member['name']}</div>
                 <div class="team-role">{member['role']}</div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
 # ── TECHNICAL TEAM ───────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">Technical Team</div>', unsafe_allow_html=True)
@@ -382,36 +430,64 @@ st.markdown('<div class="section-header">Technical Team</div>', unsafe_allow_htm
 tech_team = [
     {"name": "Engr. Joseph Den Amores", "role": "Developer", "id": "joseph_amores"},
     {"name": "Engr. Charles Darwin Maddela", "role": "Developer", "id": "chad_madella"},
-    {"name": "Engr. Victor Sebastian Bondoc", "role": "Developer", "id": "victor_sebastian"},
-    {"name": "Engr. Julius Nikolai Bernardo", "role": "Developer", "id": "julius_bernardo"},
-    {"name": "Ms. Maria Kristinna Alina", "role": "Project Manager", "id": "kristina_alina"}
+    {
+        "name": "Engr. Victor Sebastian Bondoc",
+        "role": "Developer",
+        "id": "victor_sebastian",
+    },
+    {
+        "name": "Engr. Julius Nikolai Bernardo",
+        "role": "Developer",
+        "id": "julius_bernardo",
+    },
+    {
+        "name": "Ms. Maria Kristinna Alina",
+        "role": "Project Manager",
+        "id": "kristina_alina",
+    },
 ]
 
-rows_tech = [tech_team[i:i+4] for i in range(0, len(tech_team), 4)]
+rows_tech = [tech_team[i : i + 4] for i in range(0, len(tech_team), 4)]
 for row in rows_tech:
     cols = st.columns(4)
     for i, member in enumerate(row):
         with cols[i]:
             b64 = get_base64_image(os.path.join(ASSETS_DIR, f"{member['id']}.png"))
-            photo_html = f'<img src="data:image/png;base64,{b64}" class="team-photo">' if b64 else '<div style="color:#cbd5e1; font-size:2rem;">👤</div>'
-            st.markdown(f"""
+            photo_html = (
+                f'<img src="data:image/png;base64,{b64}" class="team-photo">'
+                if b64
+                else '<div style="color:#cbd5e1; font-size:2rem;">👤</div>'
+            )
+            st.markdown(
+                f"""
             <div class="team-card">
                 <div class="team-photo-container">{photo_html}</div>
                 <div class="team-name">{member['name']}</div>
                 <div class="team-role">{member['role']}</div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
 # ── ABOUT ME ─────────────────────────────────────────────────────────────────
 st.markdown('<div class="section-header">About Me</div>', unsafe_allow_html=True)
 
 p_b64 = get_base64_image(os.path.join(ASSETS_DIR, "profile.png"))
-profile_html = f'<img src="data:image/png;base64,{p_b64}" class="profile-photo">' if p_b64 else '<div class="profile-placeholder">Profile Photo</div>'
+profile_html = (
+    f'<img src="data:image/png;base64,{p_b64}" class="profile-photo">'
+    if p_b64
+    else '<div class="profile-placeholder">Profile Photo</div>'
+)
 
 b_b64 = get_base64_image(os.path.join(ASSETS_DIR, "bulsu_logo.png"))
-bulsu_overlay_html = f'<div class="bulsu-logo-overlay"><img src="data:image/png;base64,{b_b64}" class="logo-img"></div>' if b_b64 else '<div class="bulsu-logo-overlay">BulSU Logo</div>'
+bulsu_overlay_html = (
+    f'<div class="bulsu-logo-overlay"><img src="data:image/png;base64,{b_b64}" class="logo-img"></div>'
+    if b_b64
+    else '<div class="bulsu-logo-overlay">BulSU Logo</div>'
+)
 
-st.markdown(f"""
+st.markdown(
+    f"""
 <div class="profile-card">
     <div class="profile-img-container">{profile_html}{bulsu_overlay_html}</div>
     <div class="profile-details">
@@ -431,7 +507,12 @@ st.markdown(f"""
         </ul>
     </div>
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # ── FOOTER ───────────────────────────────────────────────────────────────────
-st.markdown('<div class="designer-footer">Designed by <span class="swyft">swyft</span></div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="designer-footer">Designed by <span class="swyft">swyft</span></div>',
+    unsafe_allow_html=True,
+)

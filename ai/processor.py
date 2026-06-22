@@ -25,7 +25,7 @@ from ai.yolov8seg_inference import (
 
 logger = logging.getLogger(__name__)
 
-MODEL_YOLOV11   = "yolov11"
+MODEL_YOLOV11 = "yolov11"
 MODEL_YOLOV8SEG = "yolov8seg"
 
 
@@ -78,7 +78,9 @@ def process_media(
         # 5. Mark media as completed and save the annotated path
         db.update_media_status(media_id, "completed", annotated_url)
 
-        logger.info(f"[{media_id}] Processed ({model_type}) — {len(detections)} detection(s)")
+        logger.info(
+            f"[{media_id}] Processed ({model_type}) — {len(detections)} detection(s)"
+        )
         return {"success": True, "detections": detections, "error": None}
 
     except Exception as e:
@@ -87,7 +89,9 @@ def process_media(
         return {"success": False, "detections": [], "error": str(e)}
 
 
-def process_batch(media_records: list[dict], model_type: str = MODEL_YOLOV11) -> list[dict]:
+def process_batch(
+    media_records: list[dict], model_type: str = MODEL_YOLOV11
+) -> list[dict]:
     """
     Processes a list of media records.
 

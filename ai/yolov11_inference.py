@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Optional
 
 # Heavy imports deferred inside functions to prevent top-level crashes on minimal environments
-# import cv2 
+# import cv2
 # import numpy as np
 from PIL import Image
 
@@ -26,13 +26,14 @@ logger = logging.getLogger(__name__)
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
-BASE_DIR     = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 WEIGHTS_PATH = BASE_DIR / "models" / "yolov11" / "weights" / "best.pt"
-LABELS_PATH  = BASE_DIR / "models" / "yolov11" / "labels" / "classes.txt"
+LABELS_PATH = BASE_DIR / "models" / "yolov11" / "labels" / "classes.txt"
 
 # ── Model loader (singleton) ──────────────────────────────────────────────────
 
 _model = None
+
 
 def load_model(weights_path: Path = WEIGHTS_PATH):
     """
@@ -66,18 +67,20 @@ def get_class_names(model) -> dict:
     Returns class names from the model. Falls back to classes.txt if needed.
     Model-embedded names always take priority.
     """
-    if hasattr(model, 'names') and model.names:
+    if hasattr(model, "names") and model.names:
         return model.names  # dict: {0: 'pothole', 1: 'crack', ...}
 
     # Fallback: read from classes.txt
     if LABELS_PATH.exists():
-        with open(LABELS_PATH, 'r') as f:
-            lines = [l.strip() for l in f if l.strip() and not l.startswith('#')]
+        with open(LABELS_PATH, "r") as f:
+            lines = [l.strip() for l in f if l.strip() and not l.startswith("#")]
         return {i: name for i, name in enumerate(lines)}
 
     return {}
 
+
 # ── Inference ─────────────────────────────────────────────────────────────────
+
 
 def run_inference(
     image_bytes: bytes,
@@ -103,6 +106,7 @@ def run_inference(
     """
     import cv2
     import numpy as np
+
     model = load_model()
 
     # Convert bytes → PIL Image
@@ -123,16 +127,18 @@ def run_inference(
     result = results[0]  # single image
     if result.boxes is not None:
         for box in result.boxes:
-            class_id   = int(box.cls[0].item())
+            class_id = int(box.cls[0].item())
             confidence = round(float(box.conf[0].item()), 4)
-            bbox       = [round(v, 1) for v in box.xyxy[0].tolist()]
+            bbox = [round(v, 1) for v in box.xyxy[0].tolist()]
             damage_type = class_names.get(class_id, f"class_{class_id}")
 
-            detections.append({
-                "damage_type": damage_type,
-                "confidence":  confidence,
-                "bbox":        bbox,       # [x1, y1, x2, y2]
-            })
+            detections.append(
+                {
+                    "damage_type": damage_type,
+                    "confidence": confidence,
+                    "bbox": bbox,  # [x1, y1, x2, y2]
+                }
+            )
 
     # Generate annotated image (BGR numpy array)
     annotated_np = result.plot()  # draws boxes, labels, confidence scores

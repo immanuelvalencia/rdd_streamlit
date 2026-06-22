@@ -5,31 +5,42 @@ db.init_db()
 st.set_page_config(page_title="Road Damage Detection", page_icon="🛣️", layout="wide")
 
 # ── HIDE STREAMLIT BRANDING ──────────────────────────────────────────────────
-st.markdown("""
+st.markdown(
+    """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     </style>
-    """, unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
-if 'user' not in st.session_state:
+if "user" not in st.session_state:
     user, profile = db.restore_session()
     st.session_state.user = user
     if user:
         st.session_state.profile = profile
 
-login_page           = st.Page("pages/login.py",           title="Login / Sign Up", icon="🔐", default=True)
-analytics_page       = st.Page("pages/analytics.py",       title="Dashboard",       icon="📊")
-projects_page        = st.Page("pages/projects.py",        title="Projects",        icon="📂")
-project_details_page = st.Page("pages/project_details.py", title="Project Viewer",  icon="🔍", url_path="project")
-settings_page        = st.Page("pages/settings.py",        title="Settings",        icon="⚙️")
-about_page           = st.Page("pages/about.py",           title="About the Project",      icon="🏢")
+login_page = st.Page("pages/login.py", title="Login / Sign Up", icon="🔐", default=True)
+analytics_page = st.Page("pages/analytics.py", title="Dashboard", icon="📊")
+projects_page = st.Page("pages/projects.py", title="Projects", icon="📂")
+project_details_page = st.Page(
+    "pages/project_details.py", title="Project Viewer", icon="🔍", url_path="project"
+)
+settings_page = st.Page("pages/settings.py", title="Settings", icon="⚙️")
+about_page = st.Page("pages/about.py", title="About the Project", icon="🏢")
 
 if st.session_state.user:
-    profile = st.session_state.get('profile', {})
-    name = profile.get('name', st.session_state.user.email)
+    profile = st.session_state.get("profile", {})
+    name = profile.get("name", st.session_state.user.email)
 
-    all_pages = [analytics_page, projects_page, about_page, project_details_page, settings_page]
+    all_pages = [
+        analytics_page,
+        projects_page,
+        about_page,
+        project_details_page,
+        settings_page,
+    ]
     pg = st.navigation(all_pages, position="hidden")
 
     # ── Sidebar: Navigation ───────────────────────────────────────────────────
@@ -45,7 +56,7 @@ if st.session_state.user:
     if st.sidebar.button("🚪 Logout", width="stretch"):
         db.sign_out()
         st.session_state.user = None
-        st.session_state.pop('profile', None)
+        st.session_state.pop("profile", None)
         st.rerun()
 
 else:
