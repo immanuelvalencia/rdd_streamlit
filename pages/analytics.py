@@ -3,6 +3,211 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import database as db
+import datetime
+import tempfile
+import os
+from fpdf import FPDF
+
+@st.cache_data
+def convert_df_to_csv(df):
+    export_df = df.copy()
+    rename_dict = {
+        "project_name": "Project Name",
+        "street": "Street",
+        "city": "City",
+        "province": "Province",
+        "region": "Region",
+        "latitude": "Latitude",
+        "longitude": "Longitude",
+        "status": "Processing Status",
+        "damage_type": "Damage Type",
+        "confidence": "Detection Confidence"
+    }
+    export_df = export_df.rename(columns=rename_dict)
+    desired_cols = [
+        "Project Name", "Street", "City", "Province", "Region", 
+        "Latitude", "Longitude", "Processing Status", "Damage Type", "Detection Confidence"
+    ]
+    existing_cols = [c for c in desired_cols if c in export_df.columns]
+    export_df = export_df[existing_cols]
+    return export_df.to_csv(index=False).encode('utf-8')
+
+@st.cache_data
+def convert_breakdown_to_csv(df):
+    if df.empty or "damage_type" not in df.columns:
+        return b""
+    breakdown_tbl = (
+        df.groupby(["project_name", "damage_type"])
+        .size()
+        .reset_index(name="Count")
+        .pivot_table(
+            index="project_name", columns="damage_type", values="Count", fill_value=0
+        )
+        .reset_index()
+        .rename(columns={"project_name": "Project"})
+    )
+    return breakdown_tbl.to_csv(index=False).encode('utf-8')
+
+def generate_pdf_report(total_projects, total_media, total_damages, density, fig_map, fig_donut, fig_bar, breakdown_tbl):
+    temp_dir = tempfile.gettempdir()
+    map_path = os.path.join(temp_dir, "temp_map.png")
+    donut_path = os.path.join(temp_dir, "temp_donut.png")
+    bar_path = os.path.join(temp_dir, "temp_bar.png")
+    
+    has_map = False
+    has_donut = False
+    has_bar = False
+    
+    try:
+        if fig_map is not None:
+            fig_map.write_image(map_path, format="png", width=800, height=450, scale=2)
+            has_map = True
+    except Exception:
+        pass
+        
+    try:
+        if fig_donut is not None:
+            fig_donut.write_image(donut_path, format="png", width=600, height=400, scale=2)
+            has_donut = True
+    except Exception:
+        pass
+        
+    try:
+        if fig_bar is not None:
+            fig_bar.write_image(bar_path, format="png", width=600, height=400, scale=2)
+            has_bar = True
+    except Exception:
+        pass
+        
+    class PDFReport(FPDF):
+        def header(self):
+            # Maroon brand banner
+            self.set_fill_color(128, 0, 0)
+            self.rect(0, 0, 210, 25, "F")
+            
+            # White text
+            self.set_text_color(255, 255, 255)
+            self.set_font("Arial", "B", 14)
+            self.cell(0, 10, "Road Damage Detection Dashboard Report", ln=1, align="L")
+            self.set_font("Arial", "I", 8)
+            self.cell(0, 5, f"Generated on {datetime.date.today().strftime('%B %d, %Y')}", ln=1, align="L")
+            self.ln(10)
+            
+        def footer(self):
+            self.set_y(-15)
+            self.set_font("Arial", "I", 8)
+            self.set_text_color(128, 128, 128)
+            self.cell(0, 10, f"Page {self.page_no()} | Confidential - For Internal Use Only", align="C")
+            
+    pdf = PDFReport(orientation="P", unit="mm", format="A4")
+    pdf.alias_nb_pages()
+    pdf.add_page()
+    
+    pdf.set_text_color(49, 51, 63)
+    pdf.set_font("Arial", "B", 18)
+    pdf.cell(0, 12, "Executive Analytics Summary", ln=1)
+    
+    pdf.set_draw_color(200, 200, 200)
+    pdf.line(10, 45, 200, 45)
+    pdf.ln(5)
+    
+    # Metrics
+    pdf.set_fill_color(240, 242, 246)
+    pdf.rect(10, 48, 190, 24, "F")
+    
+    pdf.set_y(50)
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(47.5, 6, "Total Projects", align="C")
+    pdf.cell(47.5, 6, "Images Analyzed", align="C")
+    pdf.cell(47.5, 6, "Total Distresses", align="C")
+    pdf.cell(47.5, 6, "Distress Density", align="C", ln=1)
+    
+    pdf.set_font("Arial", "B", 14)
+    pdf.set_text_color(128, 0, 0)
+    pdf.cell(47.5, 8, str(total_projects), align="C")
+    pdf.cell(47.5, 8, str(total_media), align="C")
+    pdf.cell(47.5, 8, str(total_damages), align="C")
+    pdf.cell(47.5, 8, f"{density:.1f}/img", align="C", ln=1)
+    
+    pdf.set_text_color(49, 51, 63)
+    pdf.ln(10)
+    
+    # Map
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 8, "Damage Location Map", ln=1)
+    pdf.ln(2)
+    if has_map:
+        pdf.image(map_path, x=15, y=pdf.get_y(), w=180, h=100)
+        pdf.ln(108)
+    else:
+        pdf.set_fill_color(245, 245, 245)
+        pdf.rect(15, pdf.get_y(), 180, 50, "F")
+        pdf.set_y(pdf.get_y() + 15)
+        pdf.set_font("Arial", "I", 10)
+        pdf.cell(0, 10, "Map visualization is not available in static format.", align="C", ln=1)
+        pdf.set_y(pdf.get_y() + 35)
+        
+    # Charts
+    if has_donut or has_bar:
+        if pdf.get_y() > 150:
+            pdf.add_page()
+            
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 8, "Distress Charts & Visualizations", ln=1)
+        pdf.ln(2)
+        
+        y_pos = pdf.get_y()
+        if has_donut:
+            pdf.image(donut_path, x=10, y=y_pos, w=90, h=60)
+        if has_bar:
+            pdf.image(bar_path, x=110, y=y_pos, w=90, h=60)
+        pdf.ln(70)
+        
+    # Breakdown Table
+    if breakdown_tbl is not None and not breakdown_tbl.empty:
+        if pdf.get_y() > 180:
+            pdf.add_page()
+            
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 8, "Damage Breakdown by Project", ln=1)
+        pdf.ln(4)
+        
+        cols = list(breakdown_tbl.columns)
+        num_cols = len(cols)
+        page_width = 190
+        proj_col_width = 50
+        other_col_width = (page_width - proj_col_width) / max(1, (num_cols - 1))
+        
+        # Header
+        pdf.set_fill_color(128, 0, 0)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", "B", 9)
+        for i, col in enumerate(cols):
+            w = proj_col_width if i == 0 else other_col_width
+            pdf.cell(w, 7, str(col), border=1, align="C" if i > 0 else "L", fill=True)
+        pdf.ln()
+        
+        # Body
+        pdf.set_text_color(49, 51, 63)
+        pdf.set_font("Arial", "", 8.5)
+        fill = False
+        for _, row in breakdown_tbl.iterrows():
+            pdf.set_fill_color(245, 245, 245) if fill else pdf.set_fill_color(255, 255, 255)
+            for i, col in enumerate(cols):
+                val = row[col]
+                w = proj_col_width if i == 0 else other_col_width
+                pdf.cell(w, 6, str(val), border=1, align="C" if i > 0 else "L", fill=True)
+            pdf.ln()
+            fill = not fill
+            
+    for path in [map_path, donut_path, bar_path]:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            pass
+            
+    return pdf.output(dest='S').encode('latin-1')
 
 st.title("📊 Analytics Dashboard")
 st.markdown("Real-time overview of all road damage detection projects.")
@@ -89,35 +294,14 @@ if sel_cities:
 if sel_damages:
     filtered_df = filtered_df[filtered_df["damage_type"].isin(sel_damages)]
 
-st.divider()
-
-# ── Metrics ──────────────────────────────────────────────────────────────────
+# Calculate metrics for export and display
 total_projects = filtered_df["project_id"].nunique()
 total_media = filtered_df["media_id"].nunique()
 detections_df = filtered_df.dropna(subset=["damage_type"])
 total_damages = len(detections_df)
 density = (total_damages / total_media) if total_media > 0 else 0.0
 
-m1, m2, m3, m4 = st.columns(4)
-with m1:
-    with st.container(border=True):
-        st.metric("Total Projects", total_projects)
-with m2:
-    with st.container(border=True):
-        st.metric("Images Analyzed", total_media)
-with m3:
-    with st.container(border=True):
-        st.metric("Total Distresses", total_damages)
-with m4:
-    with st.container(border=True):
-        st.metric("Distress Density", f"{density:.1f} per img")
-
-st.divider()
-
-# ── Map ───────────────────────────────────────────────────────────────────────
-st.subheader("🗺️ Damage Location Map")
-
-# Build per-project summary for pins (need at least lat/lon)
+# ── Prep Map Data & Figure (Early Instantiation) ──────────────────────────────
 map_df = (
     filtered_df.dropna(subset=["latitude", "longitude"])
     .groupby(
@@ -140,24 +324,22 @@ map_df = (
     .reset_index()
 )
 
-# Build damage breakdown per project for hover text
-damage_breakdown = (
-    filtered_df.dropna(subset=["damage_type", "latitude", "longitude"])
-    .groupby(["project_id", "damage_type"])
-    .size()
-    .reset_index(name="count")
-)
-
-
-def build_hover(proj_id):
-    sub = damage_breakdown[damage_breakdown["project_id"] == proj_id]
-    if sub.empty:
-        return "No detections"
-    lines = [f"  • {row['damage_type']}: {row['count']}" for _, row in sub.iterrows()]
-    return "<br>".join(lines)
-
-
+fig_map = None
 if not map_df.empty:
+    damage_breakdown = (
+        filtered_df.dropna(subset=["damage_type", "latitude", "longitude"])
+        .groupby(["project_id", "damage_type"])
+        .size()
+        .reset_index(name="count")
+    )
+
+    def build_hover(proj_id):
+        sub = damage_breakdown[damage_breakdown["project_id"] == proj_id]
+        if sub.empty:
+            return "No detections"
+        lines = [f"  • {row['damage_type']}: {row['count']}" for _, row in sub.iterrows()]
+        return "<br>".join(lines)
+
     map_df["damage_breakdown"] = map_df["project_id"].apply(build_hover)
     map_df["location"] = map_df.apply(
         lambda r: ", ".join(
@@ -177,13 +359,11 @@ if not map_df.empty:
         axis=1,
     )
 
-    # Scale pin size by total detections, min 12
     map_df["marker_size"] = (map_df["total_detections"].clip(lower=1) * 1.5 + 12).clip(
         upper=40
     )
 
     fig_map = go.Figure()
-
     fig_map.add_trace(
         go.Scattermap(
             lat=map_df["latitude"],
@@ -202,7 +382,6 @@ if not map_df.empty:
         )
     )
 
-    # Auto-center on the data
     center_lat = map_df["latitude"].mean()
     center_lon = map_df["longitude"].mean()
 
@@ -221,6 +400,144 @@ if not map_df.empty:
         ),
     )
 
+# ── Prep Charts & Breakdown Table (Early Instantiation) ──────────────────────
+fig_donut = None
+fig_bar = None
+breakdown_tbl = None
+
+if total_damages > 0:
+    damage_counts = detections_df["damage_type"].value_counts().reset_index()
+    damage_counts.columns = ["Distress Type", "Count"]
+
+    fig_donut = px.pie(
+        damage_counts,
+        values="Count",
+        names="Distress Type",
+        hole=0.4,
+        color_discrete_sequence=px.colors.qualitative.Set3,
+    )
+    fig_donut.update_layout(margin=dict(t=0, b=0, l=0, r=0))
+
+    project_damage_counts = (
+        detections_df.groupby("project_name")
+        .size()
+        .reset_index(name="Total Distresses")
+    )
+    fig_bar = px.bar(
+        project_damage_counts,
+        x="project_name",
+        y="Total Distresses",
+        color="project_name",
+        color_discrete_sequence=px.colors.qualitative.Pastel,
+    )
+    fig_bar.update_layout(
+        margin=dict(t=0, b=0, l=0, r=0), showlegend=False, xaxis_title=None
+    )
+
+    breakdown_tbl = (
+        detections_df.groupby(["project_name", "damage_type"])
+        .size()
+        .reset_index(name="Count")
+        .pivot_table(
+            index="project_name", columns="damage_type", values="Count", fill_value=0
+        )
+        .reset_index()
+        .rename(columns={"project_name": "Project"})
+    )
+
+# ── Manage PDF Export Cached State ────────────────────────────────────────────
+filter_state_key = f"{sel_projects}_{sel_regions}_{sel_provinces}_{sel_cities}_{sel_damages}"
+if st.session_state.get("last_filter_state_key") != filter_state_key:
+    st.session_state.pdf_report_bytes = None
+    st.session_state.last_filter_state_key = filter_state_key
+
+# ── Export Action Bar ─────────────────────────────────────────────────────────
+export_col1, export_col2 = st.columns([2, 1])
+with export_col1:
+    st.markdown(
+        f"💡 *Showing **{total_projects}** projects, **{total_media}** images, and **{total_damages}** distresses based on filters.*"
+    )
+with export_col2:
+    with st.popover("📤 Export Data Options", use_container_width=True):
+        st.markdown("### 📊 Export Dashboard Data")
+        st.write("Download the filtered records based on your active selections.")
+        
+        csv_detailed = convert_df_to_csv(filtered_df)
+        st.download_button(
+            label="📥 Download Detailed CSV",
+            data=csv_detailed,
+            file_name="rdd_detailed_analytics.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+        
+        if total_damages > 0:
+            csv_breakdown = convert_breakdown_to_csv(detections_df)
+            st.download_button(
+                label="📥 Download Breakdown CSV",
+                data=csv_breakdown,
+                file_name="rdd_project_breakdown.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+        else:
+            st.button(
+                label="📥 Download Breakdown CSV",
+                disabled=True,
+                use_container_width=True,
+                help="No distresses available to summarize."
+            )
+            
+        st.markdown("---")
+        st.markdown("### 📄 PDF Document Export")
+        
+        if st.session_state.pdf_report_bytes is None:
+            if st.button("Generate PDF Report", use_container_width=True):
+                with st.spinner("Compiling PDF report (rendering charts)..."):
+                    try:
+                        pdf_data = generate_pdf_report(
+                            total_projects, total_media, total_damages, density,
+                            fig_map, fig_donut, fig_bar, breakdown_tbl
+                        )
+                        st.session_state.pdf_report_bytes = pdf_data
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to generate PDF: {e}")
+        else:
+            st.download_button(
+                label="📥 Download PDF Report",
+                data=st.session_state.pdf_report_bytes,
+                file_name="rdd_analytics_report.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
+            if st.button("🔄 Regenerate PDF", use_container_width=True):
+                st.session_state.pdf_report_bytes = None
+                st.rerun()
+
+st.divider()
+
+# ── Metrics ──────────────────────────────────────────────────────────────────
+m1, m2, m3, m4 = st.columns(4)
+with m1:
+    with st.container(border=True):
+        st.metric("Total Projects", total_projects)
+with m2:
+    with st.container(border=True):
+        st.metric("Images Analyzed", total_media)
+with m3:
+    with st.container(border=True):
+        st.metric("Total Distresses", total_damages)
+with m4:
+    with st.container(border=True):
+        st.metric("Distress Density", f"{density:.1f} per img")
+
+st.divider()
+
+# ── Map ───────────────────────────────────────────────────────────────────────
+st.subheader("🗺️ Damage Location Map")
+
+if not map_df.empty and fig_map is not None:
     map_event = st.plotly_chart(
         fig_map, width="stretch", on_select="rerun", selection_mode="points"
     )
@@ -248,50 +565,14 @@ if total_damages > 0:
 
     with chart_col1:
         st.subheader("Distress Classification")
-        damage_counts = detections_df["damage_type"].value_counts().reset_index()
-        damage_counts.columns = ["Distress Type", "Count"]
-
-        fig_donut = px.pie(
-            damage_counts,
-            values="Count",
-            names="Distress Type",
-            hole=0.4,
-            color_discrete_sequence=px.colors.qualitative.Set3,
-        )
-        fig_donut.update_layout(margin=dict(t=0, b=0, l=0, r=0))
         st.plotly_chart(fig_donut, width="stretch")
 
     with chart_col2:
         st.subheader("Distresses per Project")
-        project_damage_counts = (
-            detections_df.groupby("project_name")
-            .size()
-            .reset_index(name="Total Distresses")
-        )
-        fig_bar = px.bar(
-            project_damage_counts,
-            x="project_name",
-            y="Total Distresses",
-            color="project_name",
-            color_discrete_sequence=px.colors.qualitative.Pastel,
-        )
-        fig_bar.update_layout(
-            margin=dict(t=0, b=0, l=0, r=0), showlegend=False, xaxis_title=None
-        )
         st.plotly_chart(fig_bar, width="stretch")
 
     # ── Damage breakdown table per project ────────────────────────────────────
     st.subheader("Damage Breakdown by Project")
-    breakdown_tbl = (
-        detections_df.groupby(["project_name", "damage_type"])
-        .size()
-        .reset_index(name="Count")
-        .pivot_table(
-            index="project_name", columns="damage_type", values="Count", fill_value=0
-        )
-        .reset_index()
-        .rename(columns={"project_name": "Project"})
-    )
     st.dataframe(breakdown_tbl, width="stretch", hide_index=True)
 
 else:

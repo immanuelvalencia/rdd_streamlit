@@ -14,3 +14,5 @@ ultralytics
 opencv-python-headless
 pillow
 
+# Export
+kaleido
