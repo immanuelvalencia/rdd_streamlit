@@ -207,7 +207,7 @@ def generate_pdf_report(total_projects, total_media, total_damages, density, fig
         except Exception:
             pass
             
-    return pdf.output(dest='S').encode('latin-1')
+    return bytes(pdf.output())
 
 st.title("📊 Analytics Dashboard")
 st.markdown("Real-time overview of all road damage detection projects.")

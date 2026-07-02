@@ -16,3 +16,4 @@ pillow
 
 # Export
 kaleido
+fpdf2
